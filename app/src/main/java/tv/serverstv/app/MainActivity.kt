@@ -248,7 +248,8 @@ class MainActivity : Activity() {
     companion object {
         private const val VPN_PERMISSION_REQUEST = 4107
         private const val PREFS = "serverstv_settings"
-        private const val KEY_DEVICE_KEY = "device_key"\n        private const val API_BASE = "https://fgwvyrhjcofebyluxtbg.supabase.co/functions/v1/servers-bot"
+        private const val KEY_DEVICE_KEY = "device_key"
+        private const val API_BASE = "https://fgwvyrhjcofebyluxtbg.supabase.co/functions/v1/servers-bot"
     }
 }
 
