@@ -1,0 +1,62 @@
+name: Android TV APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ServersTV
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          ndk-version: 27.2.12479018
+
+      - name: Build official libXray Android AAR
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/XTLS/libXray.git /tmp/libxray
+          cd /tmp/libxray
+          python3 build/main.py android
+          AAR="$(find . -type f -name '*.aar' -print -quit)"
+          test -n "$AAR"
+          mkdir -p "$GITHUB_WORKSPACE/app/libs"
+          cp "$AAR" "$GITHUB_WORKSPACE/app/libs/libxray.aar"
+          ls -lh "$GITHUB_WORKSPACE/app/libs/libxray.aar"
+
+      - name: Build APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ServersTV-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
