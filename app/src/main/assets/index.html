@@ -49,7 +49,7 @@ function render(){
   $("selected").textContent="Выбран: "+serverName(servers[selected],selected);
 }
 window.onServersLoaded=function(body){try{const data=JSON.parse(body);if(!Array.isArray(data))throw Error("Неверный формат подписки");servers=data;selected=0;render();$("description").textContent="Выбери сервер для подключения";$("subscriptionModal").classList.remove("open");toast("Серверы обновлены")}catch(e){window.onServersError(e.message)}};
-window.onServersError=function(message){if(message==="NO_SUBSCRIPTION"){$("subscriptionModal").classList.add("open");$("description").textContent="Добавь ссылку своей подписки";$("count").textContent="Подписка не подключена"}else{toast(message);$("description").textContent=message;if(!servers.length){$("subscriptionModal").classList.add("open")}}};
+window.onServersError=function(message){if(message==="NO_SUBSCRIPTION"){$("subscriptionModal").classList.add("open");$("description").textContent="Добавь ссылку своей подписки";$("count").textContent="Подписка не подключена";setTimeout(()=>$("subscriptionInput").focus(),250)}else{toast(message);$("description").textContent=message;if(!servers.length){$("subscriptionModal").classList.add("open")}}};
 window.onSubscriptionPasted=function(value){$("subscriptionInput").value=value||"";if(!value)toast("Буфер обмена пуст")};
 window.onVpnStatus=function(state,detail){
  if(state==="connected"){connected=true;$("connect").classList.add("on");$("status").textContent="Подключено";$("description").textContent=serverName(servers[selected],selected)}
