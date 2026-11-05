@@ -45,7 +45,9 @@ class XrayVpnService : VpnService() {
                 .setSession("ServersTV")
                 .setMtu(1500)
                 .addAddress("10.111.0.1", 32)
+                .addAddress("fd00:1111:1111::1", 128)
                 .addRoute("0.0.0.0", 0)
+                .addRoute("::", 0)
                 .addDnsServer("1.1.1.1")
                 .establish() ?: throw IllegalStateException("Android не создал VPN-интерфейс")
 
