@@ -24,11 +24,11 @@ button:focus,input:focus{outline:3px solid var(--green);outline-offset:4px;z-ind
 </style></head><body>
 <div class="app">
 <section class="left"><button class="connect" id="connect" aria-label="Подключить VPN">⏻</button><div class="status"><h2 id="status">Не подключено</h2><p id="description">Загружаю твою подписку…</p></div></section>
-<section class="right"><div class="top"><div><h1>Серверы</h1><p class="count" id="count">Загрузка списка…</p></div><button class="refresh" id="refresh" aria-label="Обновить серверы">↻</button></div><div class="list" id="list"></div><div class="footer"><span>ServersTV</span><span id="selected">Сервер не выбран</span></div></section></div>
+<section class="right"><div class="top"><div><h1>Серверы</h1><p class="count" id="count">Загрузка списка…</p></div><div style="display:flex;gap:12px;align-items:center"><button id="openSubscription" class="refresh" style="width:auto;padding:0 18px;font-size:16px;border-radius:14px">Добавить подписку</button><button class="refresh" id="refresh" aria-label="Обновить серверы">↻</button></div></div><div class="list" id="list"></div><div class="footer"><span>ServersTV</span><span id="selected">Сервер не выбран</span></div></section></div>
 <div class="toast" id="toast"></div>
 <div class="modal" id="subscriptionModal"><div class="dialog">
 <h2>Подключить подписку</h2><p>Вставь ссылку подписки из своего Telegram-бота. Она будет сохранена только на этом устройстве и не попадёт в GitHub.</p>
-<input id="subscriptionInput" type="text" placeholder="https://…/servers-bot?subscription=…" />
+<input id="subscriptionInput" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Вставь ссылку подписки…" />
 <div class="actions"><button id="pasteSubscription">Вставить из буфера</button><button id="saveSubscription" class="primary">Сохранить</button></div>
 </div></div>
 <script>
@@ -49,7 +49,7 @@ function render(){
   $("selected").textContent="Выбран: "+serverName(servers[selected],selected);
 }
 window.onServersLoaded=function(body){try{const data=JSON.parse(body);if(!Array.isArray(data))throw Error("Неверный формат подписки");servers=data;selected=0;render();$("description").textContent="Выбери сервер для подключения";$("subscriptionModal").classList.remove("open");toast("Серверы обновлены")}catch(e){window.onServersError(e.message)}};
-window.onServersError=function(message){if(message==="NO_SUBSCRIPTION"){$("subscriptionModal").classList.add("open");$("description").textContent="Добавь ссылку своей подписки";$("count").textContent="Подписка не подключена"}else{toast(message);$("description").textContent=message}};
+window.onServersError=function(message){if(message==="NO_SUBSCRIPTION"){$("subscriptionModal").classList.add("open");$("description").textContent="Добавь ссылку своей подписки";$("count").textContent="Подписка не подключена"}else{toast(message);$("description").textContent=message;if(!servers.length){$("subscriptionModal").classList.add("open")}}};
 window.onSubscriptionPasted=function(value){$("subscriptionInput").value=value||"";if(!value)toast("Буфер обмена пуст")};
 window.onVpnStatus=function(state,detail){
  if(state==="connected"){connected=true;$("connect").classList.add("on");$("status").textContent="Подключено";$("description").textContent=serverName(servers[selected],selected)}
@@ -64,10 +64,10 @@ $("connect").onclick=()=>{
  AndroidVpn.connect(JSON.stringify(config));
 };
 $("refresh").onclick=()=>{if(loading)return;loading=true;toast("Обновляю серверы…");AndroidVpn.loadServers();setTimeout(()=>loading=false,3000)};
-$("pasteSubscription").onclick=()=>AndroidVpn.pasteSubscriptionFromClipboard();
-$("saveSubscription").onclick=()=>{const value=$("subscriptionInput").value.trim();if(!value){toast("Вставь ссылку подписки");return}AndroidVpn.saveSubscriptionUrl(value)};
+$("openSubscription").onclick=()=>{$("subscriptionModal").classList.add("open");$("subscriptionInput").focus()};\n$("pasteSubscription").onclick=()=>AndroidVpn.pasteSubscriptionFromClipboard();
+$("saveSubscription").onclick=()=>{const value=$("subscriptionInput").value.trim();if(!value){toast("Вставь ссылку подписки");$("subscriptionInput").focus();return}toast("Сохраняю подписку…");AndroidVpn.saveSubscriptionUrl(value)};
 document.addEventListener("keydown",e=>{
- const all=[$("connect"),$("refresh"),...document.querySelectorAll(".server"),$("pasteSubscription"),$("saveSubscription")],i=all.indexOf(document.activeElement);
+ const all=[$("connect"),$("openSubscription"),$("refresh"),...document.querySelectorAll(".server"),$("subscriptionInput"),$("pasteSubscription"),$("saveSubscription")],i=all.indexOf(document.activeElement);
  if(["ArrowDown","ArrowUp"].includes(e.key)){e.preventDefault();all[(Math.max(i,0)+(e.key==="ArrowDown"?1:all.length-1))%all.length]?.focus()}
  else if(["ArrowLeft","ArrowRight"].includes(e.key)){if(document.activeElement.classList.contains("server")){$("connect").focus()}else if(document.activeElement===$("connect")){document.querySelector(".server")?.focus()}}
  else if(e.key==="Escape"||e.key==="Backspace"){if($("subscriptionModal").classList.contains("open")){$("subscriptionModal").classList.remove("open");e.preventDefault()}}
