@@ -7,29 +7,70 @@
 .left{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:35px}
 .connect{width:min(30vw,390px);height:min(30vw,390px);min-width:220px;min-height:220px;border-radius:50%;border:5px solid #303943;background:radial-gradient(circle at 50% 40%,#19211f,#0e1216 70%);display:flex;align-items:center;justify-content:center;color:#89939c;font-size:clamp(65px,9vw,105px);cursor:pointer}
 .connect.on{border-color:var(--green);color:var(--green);box-shadow:0 0 55px #8cf0b222}
-.status{text-align:center}.status h2{font-size:clamp(22px,2.5vw,30px);margin:0 0 10px}.status p{color:var(--muted);font-size:16px;margin:0}
+.status{text-align:center}.status h2{font-size:clamp(22px,2.5vw,30px);margin:0 0 10px}.status p{color:var(--muted);font-size:16px;margin:0;max-width:360px}
 .right{width:100%;max-width:780px;justify-self:center}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
 h1{font-size:clamp(28px,3.5vw,43px);margin:0;letter-spacing:-1px}.count{color:var(--muted);margin:8px 0 0;font-size:15px}
 .refresh{width:65px;height:65px;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--green);font-size:32px;cursor:pointer}
-.list{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;max-height:68vh;overflow-y:auto}
 .server{width:100%;min-height:86px;padding:16px 22px;display:flex;align-items:center;gap:17px;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);text-align:left;cursor:pointer}
 .server:last-child{border-bottom:0}.server.selected{background:var(--active);box-shadow:inset 4px 0 var(--green)}
 .flag{width:45px;height:45px;border-radius:12px;background:#202832;display:flex;align-items:center;justify-content:center;font-size:25px;flex-shrink:0}
-.info{flex:1}.name{font-size:19px;font-weight:600}.protocol{color:var(--muted);font-size:14px;margin-top:6px}.check{color:var(--green);font-size:22px;width:25px;text-align:center}.server:not(.selected) .check{visibility:hidden}
-button:focus{outline:3px solid var(--green);outline-offset:4px;z-index:2}.server:focus{background:#202c27}
+.info{flex:1;min-width:0}.name{font-size:19px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.protocol{color:var(--muted);font-size:14px;margin-top:6px}.check{color:var(--green);font-size:22px;width:25px;text-align:center}.server:not(.selected) .check{visibility:hidden}
+button:focus,input:focus{outline:3px solid var(--green);outline-offset:4px;z-index:2}.server:focus{background:#202c27}
 .footer{margin-top:20px;display:flex;justify-content:space-between;color:var(--muted);font-size:13px}
-.toast{position:fixed;bottom:30px;left:50%;transform:translate(-50%,20px);opacity:0;background:#1a2921;color:var(--green);border:1px solid #365b44;border-radius:30px;padding:14px 24px;transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast{position:fixed;bottom:30px;left:50%;transform:translate(-50%,20px);opacity:0;background:#1a2921;color:var(--green);border:1px solid #365b44;border-radius:30px;padding:14px 24px;transition:.2s;pointer-events:none;max-width:80vw;text-align:center}.toast.show{opacity:1;transform:translate(-50%,0)}
+.modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;padding:30px;z-index:10}.modal.open{display:flex}.dialog{width:min(620px,90vw);background:#141a20;border:1px solid #303943;border-radius:22px;padding:30px;box-shadow:0 20px 80px #0009}.dialog h2{margin:0 0 12px;font-size:26px}.dialog p{color:var(--muted);line-height:1.5}.dialog input{width:100%;height:58px;border-radius:12px;border:1px solid #39434e;background:#090d12;color:white;padding:0 16px;font-size:16px;margin:12px 0 18px}.actions{display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap}.actions button{padding:14px 20px;border-radius:12px;border:1px solid #39434e;background:#202832;color:white;font-size:16px}.actions .primary{background:#8cf0b2;color:#07110b;border-color:#8cf0b2;font-weight:700}
 @media(max-width:750px){.app{grid-template-columns:1fr;padding:20px;gap:20px;overflow:auto}.connect{width:180px;height:180px;min-width:180px;min-height:180px}.left{gap:15px}.server{min-height:70px}}
-</style></head><body><div class="app">
-<section class="left"><button class="connect" id="connect" aria-label="Подключить VPN">⏻</button><div class="status"><h2 id="status">Не подключено</h2><p id="description">Выбери сервер для подключения</p></div></section>
-<section class="right"><div class="top"><div><h1>Серверы</h1><p class="count" id="count">Твои серверы · 5 доступно</p></div><button class="refresh" id="refresh" aria-label="Обновить серверы">↻</button></div><div class="list" id="list"></div><div class="footer"><span>ServersTV</span><span id="selected">Выбран: Германия</span></div></section></div><div class="toast" id="toast"></div>
+</style></head><body>
+<div class="app">
+<section class="left"><button class="connect" id="connect" aria-label="Подключить VPN">⏻</button><div class="status"><h2 id="status">Не подключено</h2><p id="description">Загружаю твою подписку…</p></div></section>
+<section class="right"><div class="top"><div><h1>Серверы</h1><p class="count" id="count">Загрузка списка…</p></div><button class="refresh" id="refresh" aria-label="Обновить серверы">↻</button></div><div class="list" id="list"></div><div class="footer"><span>ServersTV</span><span id="selected">Сервер не выбран</span></div></section></div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="subscriptionModal"><div class="dialog">
+<h2>Подключить подписку</h2><p>Вставь ссылку подписки из своего Telegram-бота. Она будет сохранена только на этом устройстве и не попадёт в GitHub.</p>
+<input id="subscriptionInput" type="text" placeholder="https://…/servers-bot?subscription=…" />
+<div class="actions"><button id="pasteSubscription">Вставить из буфера</button><button id="saveSubscription" class="primary">Сохранить</button></div>
+</div></div>
 <script>
-const servers=[{id:1,flag:"🇩🇪",name:"Германия",protocol:"VLESS"},{id:2,flag:"🇳🇱",name:"Нидерланды",protocol:"VLESS"},{id:3,flag:"🇫🇮",name:"Финляндия",protocol:"VLESS"},{id:4,flag:"🇫🇷",name:"Франция",protocol:"VLESS"},{id:5,flag:"🇵🇱",name:"Польша",protocol:"VLESS"}];
-let selected=1,connected=false;const $=id=>document.getElementById(id);
-function toast(s){$("toast").textContent=s;$("toast").classList.add("show");clearTimeout(window.tt);window.tt=setTimeout(()=>$("toast").classList.remove("show"),1900)}
-function render(){$("list").innerHTML=servers.map(s=>'<button class="server '+(s.id===selected?'selected':'')+'" data-id="'+s.id+'"><span class="flag">'+s.flag+'</span><span class="info"><div class="name">'+s.name+'</div><div class="protocol">'+s.protocol+'</div></span><span class="check">✓</span></button>').join("");document.querySelectorAll(".server").forEach(b=>b.onclick=()=>{selected=+b.dataset.id;render();toast("Выбран сервер: "+servers.find(s=>s.id===selected).name)});$("count").textContent="Твои серверы · "+servers.length+" доступно";$("selected").textContent="Выбран: "+servers.find(s=>s.id===selected).name}
-$("connect").onclick=()=>{toast("VPN-движок ещё не подключён");};
-$("refresh").onclick=()=>toast("Подключение подписки будет добавлено следующим этапом");
-document.addEventListener("keydown",e=>{const all=[$("connect"),$("refresh"),...document.querySelectorAll(".server")],i=all.indexOf(document.activeElement);if(["ArrowDown","ArrowUp"].includes(e.key)){e.preventDefault();all[(Math.max(i,0)+(e.key==="ArrowDown"?1:all.length-1))%all.length].focus()}else if(["ArrowLeft","ArrowRight"].includes(e.key)){e.preventDefault();if(document.activeElement.classList.contains("server"))$("connect").focus();else document.querySelector(".server")?.focus()}});
-render();$("connect").focus();
+let servers=[],selected=0,connected=false,loading=false;
+const $=id=>document.getElementById(id);
+function toast(s){$("toast").textContent=s;$("toast").classList.add("show");clearTimeout(window.tt);window.tt=setTimeout(()=>$("toast").classList.remove("show"),2400)}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function serverName(s,i){return String(s.remarks||s.name||s.outbounds?.[0]?.tag||("Сервер "+(i+1))).slice(0,90)}
+function protocolName(s){return String(s.outbounds?.find(x=>x&&x.protocol)?.protocol||"Xray").toUpperCase()}
+function flagFor(name){const m=name.match(/🇦🇱|🇦🇩|🇦🇹|🇧🇪|🇧🇬|🇭🇷|🇨🇾|🇨🇿|🇩🇰|🇪🇪|🇫🇮|🇫🇷|🇩🇪|🇬🇷|🇭🇺|🇮🇸|🇮🇪|🇮🇹|🇱🇻|🇱🇹|🇱🇺|🇲🇹|🇳🇱|🇳🇴|🇵🇱|🇵🇹|🇷🇴|🇷🇸|🇸🇰|🇸🇮|🇪🇸|🇸🇪|🇨🇭|🇹🇷|🇬🇧|🇺🇸|🇨🇦|🇯🇵|🇸🇬|🇷🇺/u);return m?m[0]:"🌐"}
+function render(){
+  const list=$("list");
+  if(!servers.length){list.innerHTML="";$("count").textContent="Серверов нет";$("selected").textContent="Сервер не выбран";return}
+  if(selected>=servers.length)selected=0;
+  list.innerHTML=servers.map((s,i)=>{const name=serverName(s,i);return '<button class="server '+(i===selected?'selected':'')+'" data-id="'+i+'"><span class="flag">'+flagFor(name)+'</span><span class="info"><div class="name">'+escapeHtml(name.replace(/[🇦-🇿]{2}/gu,"").trim())+'</div><div class="protocol">'+escapeHtml(protocolName(s))+'</div></span><span class="check">✓</span></button>'}).join("");
+  document.querySelectorAll(".server").forEach(b=>b.onclick=()=>{selected=+b.dataset.id;render();$("description").textContent="Выбран сервер для подключения";toast("Выбран: "+serverName(servers[selected],selected))});
+  $("count").textContent="Твои серверы · "+servers.length+" доступно";
+  $("selected").textContent="Выбран: "+serverName(servers[selected],selected);
+}
+window.onServersLoaded=function(body){try{const data=JSON.parse(body);if(!Array.isArray(data))throw Error("Неверный формат подписки");servers=data;selected=0;render();$("description").textContent="Выбери сервер для подключения";$("subscriptionModal").classList.remove("open");toast("Серверы обновлены")}catch(e){window.onServersError(e.message)}};
+window.onServersError=function(message){if(message==="NO_SUBSCRIPTION"){$("subscriptionModal").classList.add("open");$("description").textContent="Добавь ссылку своей подписки";$("count").textContent="Подписка не подключена"}else{toast(message);$("description").textContent=message}};
+window.onSubscriptionPasted=function(value){$("subscriptionInput").value=value||"";if(!value)toast("Буфер обмена пуст")};
+window.onVpnStatus=function(state,detail){
+ if(state==="connected"){connected=true;$("connect").classList.add("on");$("status").textContent="Подключено";$("description").textContent=serverName(servers[selected],selected)}
+ else if(state==="disconnected"){connected=false;$("connect").classList.remove("on");$("status").textContent="Не подключено";$("description").textContent=detail||"Выбери сервер для подключения"}
+ else if(state==="error"){connected=false;$("connect").classList.remove("on");$("status").textContent="Ошибка подключения";$("description").textContent=detail||"Xray не запустился";toast(detail||"Ошибка Xray")}
+};
+$("connect").onclick=()=>{
+ if(connected){AndroidVpn.disconnect();return}
+ if(!servers.length){$("subscriptionModal").classList.add("open");return}
+ const config=servers[selected];
+ $("status").textContent="Подключение…";$("description").textContent=serverName(config,selected);
+ AndroidVpn.connect(JSON.stringify(config));
+};
+$("refresh").onclick=()=>{if(loading)return;loading=true;toast("Обновляю серверы…");AndroidVpn.loadServers();setTimeout(()=>loading=false,3000)};
+$("pasteSubscription").onclick=()=>AndroidVpn.pasteSubscriptionFromClipboard();
+$("saveSubscription").onclick=()=>{const value=$("subscriptionInput").value.trim();if(!value){toast("Вставь ссылку подписки");return}AndroidVpn.saveSubscriptionUrl(value)};
+document.addEventListener("keydown",e=>{
+ const all=[$("connect"),$("refresh"),...document.querySelectorAll(".server"),$("pasteSubscription"),$("saveSubscription")],i=all.indexOf(document.activeElement);
+ if(["ArrowDown","ArrowUp"].includes(e.key)){e.preventDefault();all[(Math.max(i,0)+(e.key==="ArrowDown"?1:all.length-1))%all.length]?.focus()}
+ else if(["ArrowLeft","ArrowRight"].includes(e.key)){if(document.activeElement.classList.contains("server")){$("connect").focus()}else if(document.activeElement===$("connect")){document.querySelector(".server")?.focus()}}
+ else if(e.key==="Escape"||e.key==="Backspace"){if($("subscriptionModal").classList.contains("open")){$("subscriptionModal").classList.remove("open");e.preventDefault()}}
+});
+AndroidVpn.loadServers();
 </script></body></html>
