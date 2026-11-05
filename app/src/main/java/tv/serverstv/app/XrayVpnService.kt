@@ -34,7 +34,7 @@ class XrayVpnService : VpnService() {
 
     private fun startTunnel(source: String) {
         try {
-            stopTunnel()
+            stopTunnel(stopService = false)
             val root = JSONObject(source)
             if (root.optJSONArray("outbounds").isNullOrEmpty()) {
                 throw IllegalArgumentException("В конфигурации нет outbounds")
@@ -108,7 +108,7 @@ class XrayVpnService : VpnService() {
         }
     }
 
-    private fun stopTunnel() {
+    private fun stopTunnel(stopService: Boolean = true) {
         try {
             invokeLibXray(
                 "invoke",
@@ -124,7 +124,7 @@ class XrayVpnService : VpnService() {
         tun?.close()
         tun = null
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        if (stopService) stopSelf()
     }
 
     private fun notification(message: String): Notification {
