@@ -65,53 +65,7 @@ class MainActivity : Activity() {
     inner class VpnBridge {
         @JavascriptInterface
         fun loadServers() {
-            val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-            val subscriptionUrl = prefs.getString(KEY_SUBSCRIPTION_URL, null)
-            if (subscriptionUrl.isNullOrBlank()) {
-                runOnUiThread {
-                    web.evaluateJavascript("window.onServersError && window.onServersError('NO_SUBSCRIPTION')", null)
-                }
-                return
-            }
-            io.execute {
-                var connection: HttpURLConnection? = null
-                try {
-                    connection = URL(subscriptionUrl).openConnection() as HttpURLConnection
-                    connection.requestMethod = "GET"
-                    connection.connectTimeout = 15000
-                    connection.readTimeout = 20000
-                    connection.setRequestProperty("Accept", "application/json")
-                    connection.setRequestProperty("User-Agent", "ServersTV/0.2 Android")
-                    val code = connection.responseCode
-                    val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-                    val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    if (code !in 200..299) throw IllegalStateException("HTTP $code")
-                    val parsed = JSONArray(body)
-                    if (parsed.length() == 0) throw IllegalStateException("В подписке пока нет серверов")
-                    for (i in 0 until parsed.length()) {
-                        val item = parsed.optJSONObject(i)
-                            ?: throw IllegalStateException("Некорректная конфигурация №${i + 1}")
-                        if (item.optJSONArray("outbounds").isNullOrEmpty()) {
-                            throw IllegalStateException("В конфигурации №${i + 1} нет outbounds")
-                        }
-                    }
-                    runOnUiThread {
-                        web.evaluateJavascript(
-                            "window.onServersLoaded && window.onServersLoaded(${JSONObject.quote(body)})",
-                            null
-                        )
-                    }
-                } catch (e: Exception) {
-                    runOnUiThread {
-                        web.evaluateJavascript(
-                            "window.onServersError && window.onServersError(${JSONObject.quote(e.message ?: "Ошибка загрузки")})",
-                            null
-                        )
-                    }
-                } finally {
-                    connection?.disconnect()
-                }
-            }
+            fetchSubscriptionServers()
         }
 
         @JavascriptInterface
@@ -125,7 +79,7 @@ class MainActivity : Activity() {
                 require(!uri.getQueryParameter("subscription").isNullOrBlank())
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putString(KEY_SUBSCRIPTION_URL, raw).apply()
-                runOnUiThread { loadServers() }
+                runOnUiThread { fetchSubscriptionServers() }
             } catch (_: Exception) {
                 runOnUiThread {
                     web.evaluateJavascript("window.onServersError && window.onServersError('Неверная ссылка подписки')", null)
@@ -172,8 +126,54 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun loadServers() {
-        web.evaluateJavascript("window.onServersError && window.onServersError('NO_SUBSCRIPTION')", null)
+    private fun fetchSubscriptionServers() {
+        val subscriptionUrl = getSharedPreferences(PREFS, MODE_PRIVATE)
+            .getString(KEY_SUBSCRIPTION_URL, null)
+        if (subscriptionUrl.isNullOrBlank()) {
+            runOnUiThread {
+                web.evaluateJavascript("window.onServersError && window.onServersError('NO_SUBSCRIPTION')", null)
+            }
+            return
+        }
+        io.execute {
+            var connection: HttpURLConnection? = null
+            try {
+                connection = URL(subscriptionUrl).openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 20000
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setRequestProperty("User-Agent", "ServersTV/0.2 Android")
+                val code = connection.responseCode
+                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                if (code !in 200..299) throw IllegalStateException("HTTP $code")
+                val parsed = JSONArray(body)
+                if (parsed.length() == 0) throw IllegalStateException("В подписке пока нет серверов")
+                for (i in 0 until parsed.length()) {
+                    val item = parsed.optJSONObject(i)
+                        ?: throw IllegalStateException("Некорректная конфигурация №${i + 1}")
+                    if (item.optJSONArray("outbounds").isNullOrEmpty()) {
+                        throw IllegalStateException("В конфигурации №${i + 1} нет outbounds")
+                    }
+                }
+                runOnUiThread {
+                    web.evaluateJavascript(
+                        "window.onServersLoaded && window.onServersLoaded(${JSONObject.quote(body)})",
+                        null
+                    )
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    web.evaluateJavascript(
+                        "window.onServersError && window.onServersError(${JSONObject.quote(e.message ?: "Ошибка загрузки")})",
+                        null
+                    )
+                }
+            } finally {
+                connection?.disconnect()
+            }
+        }
     }
 
     @Deprecated("Deprecated in Android API")
