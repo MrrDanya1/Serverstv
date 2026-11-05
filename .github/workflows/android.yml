@@ -41,6 +41,12 @@ jobs:
         with:
           ndk-version: 27.2.12479018
 
+      - name: Install Android SDK platform and expose NDK
+        shell: bash
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
       - name: Build official libXray Android AAR
         shell: bash
         run: |
