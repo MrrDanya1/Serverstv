@@ -202,17 +202,34 @@ class MainActivity : Activity() {
                     }
                 }
                 runOnUiThread {
-                    web.evaluateJavascript(
-                        "window.onServersLoaded && window.onServersLoaded(${JSONObject.quote(body)})",
-                        null
-                    )
+                    if (!::web.isInitialized || isFinishing || isDestroyed) return@runOnUiThread
+                    web.post {
+                        if (!::web.isInitialized || isFinishing || isDestroyed) return@post
+                        web.evaluateJavascript(
+                            "typeof window.onServersLoaded === 'function' ? window.onServersLoaded(${JSONObject.quote(body)}) : 'CALLBACK_MISSING'",
+                            { result ->
+                                if (result == "\"CALLBACK_MISSING\"") {
+                                    runOnUiThread {
+                                        web.evaluateJavascript(
+                                            "window.onServersError && window.onServersError('Не найден обработчик списка серверов. Перезапусти приложение.')",
+                                            null
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    web.evaluateJavascript(
-                        "window.onServersError && window.onServersError(${JSONObject.quote(e.message ?: "Ошибка загрузки")})",
-                        null
-                    )
+                    if (!::web.isInitialized || isFinishing || isDestroyed) return@runOnUiThread
+                    web.post {
+                        if (!::web.isInitialized || isFinishing || isDestroyed) return@post
+                        web.evaluateJavascript(
+                            "window.onServersError && window.onServersError(${JSONObject.quote(e.message ?: "Ошибка загрузки")})",
+                            null
+                        )
+                    }
                 }
             } finally {
                 connection?.disconnect()
