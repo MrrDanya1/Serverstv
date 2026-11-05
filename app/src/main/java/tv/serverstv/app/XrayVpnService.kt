@@ -22,6 +22,7 @@ class XrayVpnService : VpnService() {
             ACTION_START -> {
                 val config = intent.getStringExtra(EXTRA_CONFIG)
                 if (config.isNullOrBlank()) {
+                    sendStatus("error", "Пустая конфигурация сервера")
                     stopSelf(startId)
                     return START_NOT_STICKY
                 }
@@ -34,7 +35,7 @@ class XrayVpnService : VpnService() {
 
     private fun startTunnel(source: String) {
         try {
-            stopTunnel(stopService = false)
+            stopTunnel(stopService = false, notify = false)
             val root = JSONObject(source)
             if (root.optJSONArray("outbounds").isNullOrEmpty()) {
                 throw IllegalArgumentException("В конфигурации нет outbounds")
@@ -75,9 +76,12 @@ class XrayVpnService : VpnService() {
                 throw IllegalStateException(result.optString("error", "Xray не запустился"))
             }
             updateNotification("VPN запущен")
+            sendStatus("connected", "Подключено")
         } catch (e: Exception) {
-            stopTunnel()
-            updateNotification("Ошибка VPN: ${e.message ?: "неизвестная ошибка"}")
+            stopTunnel(stopService = false, notify = false)
+            val message = e.cause?.message ?: e.message ?: "Неизвестная ошибка Xray"
+            updateNotification("Ошибка VPN: $message")
+            sendStatus("error", message)
             stopSelf()
         }
     }
@@ -89,10 +93,13 @@ class XrayVpnService : VpnService() {
             contract.classLoader,
             arrayOf(contract)
         ) { _, method, args ->
-            if (method.name.equals("protectFd", true)) {
-                val fd = (args?.firstOrNull() as? Number)?.toInt() ?: -1
-                protect(fd)
-            } else null
+            when (method.name) {
+                "protectFd" -> {
+                    val fd = (args?.firstOrNull() as? Number)?.toInt() ?: -1
+                    protect(fd)
+                }
+                else -> null
+            }
         }
         api.getMethod("registerDialerController", contract).invoke(null, controller)
         api.getMethod("setDNS", contract, String::class.java)
@@ -108,13 +115,14 @@ class XrayVpnService : VpnService() {
         }
     }
 
-    private fun stopTunnel(stopService: Boolean = true) {
+    private fun stopTunnel(stopService: Boolean = true, notify: Boolean = true) {
         try {
-            invokeLibXray(
-                "invoke",
-                JSONObject().put("apiVersion", 3).put("method", "stopXray")
-                    .put("payload", JSONObject()).toString()
-            )
+            val request = JSONObject()
+                .put("apiVersion", 3)
+                .put("method", "stopXray")
+                .put("payload", JSONObject())
+                .toString()
+            invokeLibXray("invoke", request)
         } catch (_: Exception) {
         }
         try {
@@ -124,7 +132,14 @@ class XrayVpnService : VpnService() {
         tun?.close()
         tun = null
         stopForeground(STOP_FOREGROUND_REMOVE)
+        if (notify) sendStatus("disconnected", "Отключено")
         if (stopService) stopSelf()
+    }
+
+    private fun sendStatus(status: String, detail: String) {
+        sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName)
+            .putExtra(EXTRA_STATUS, status)
+            .putExtra(EXTRA_DETAIL, detail))
     }
 
     private fun notification(message: String): Notification {
@@ -152,8 +167,8 @@ class XrayVpnService : VpnService() {
     }
 
     private fun updateNotification(message: String) {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification(message))
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, notification(message))
     }
 
     override fun onRevoke() {
@@ -170,7 +185,10 @@ class XrayVpnService : VpnService() {
     companion object {
         const val ACTION_START = "tv.serverstv.app.START_VPN"
         const val ACTION_STOP = "tv.serverstv.app.STOP_VPN"
+        const val ACTION_STATUS = "tv.serverstv.app.VPN_STATUS"
         const val EXTRA_CONFIG = "xray_config"
+        const val EXTRA_STATUS = "vpn_status"
+        const val EXTRA_DETAIL = "vpn_detail"
         private const val NOTIFICATION_ID = 1001
     }
 }
