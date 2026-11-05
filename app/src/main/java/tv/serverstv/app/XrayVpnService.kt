@@ -58,10 +58,11 @@ class XrayVpnService : VpnService() {
             val inbounds = JSONArray()
             inbounds.put(JSONObject()
                 .put("tag", "tun-in")
+                .put("port", 0)
                 .put("protocol", "tun")
                 .put("settings", JSONObject()
                     .put("name", "ServersTV")
-                    .put("MTU", 1500)))
+                    .put("mtu", 1500)))
             root.put("inbounds", inbounds)
 
             val request = JSONObject()
@@ -93,8 +94,8 @@ class XrayVpnService : VpnService() {
             contract.classLoader,
             arrayOf(contract)
         ) { _, method, args ->
-            when (method.name) {
-                "protectFd" -> {
+            when {
+                method.name.equals("protectFd", ignoreCase = true) -> {
                     val fd = (args?.firstOrNull() as? Number)?.toInt() ?: -1
                     protect(fd)
                 }
