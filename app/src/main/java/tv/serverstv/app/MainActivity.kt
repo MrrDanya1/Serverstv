@@ -75,6 +75,11 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
+        fun loginWithCode(code: String) {
+            io.execute { loginWithAccessCode(code) }
+        }
+
+        @JavascriptInterface
         fun loadServers() {
             fetchSubscriptionServers()
         }
@@ -147,6 +152,47 @@ class MainActivity : Activity() {
             notifyRegistration(JSONObject(response).optString("status", "pending"))
         } catch (e: Exception) {
             notifyRegistration("error", e.message ?: "Не удалось отправить запрос")
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+
+    private fun loginWithAccessCode(code: String) {
+        var connection: HttpURLConnection? = null
+        try {
+            val cleanCode = code.trim()
+            if (!cleanCode.matches(Regex("\\d{8}"))) {
+                notifyRegistration("error", "Введи код из 8 цифр")
+                return
+            }
+            val deviceName = listOf(Build.MANUFACTURER, Build.MODEL)
+                .filter { it.isNotBlank() }.distinct().joinToString(" ").take(100)
+                .ifBlank { "Android TV" }
+            connection = URL("$API_BASE?action=login_code").openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", "ServersTV/0.4 Android")
+            val body = JSONObject()
+                .put("deviceKey", getDeviceKey())
+                .put("deviceName", deviceName)
+                .put("code", cleanCode)
+                .toString()
+            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val responseCode = connection.responseCode
+            val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
+            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            val json = runCatching { JSONObject(response) }.getOrNull()
+            if (responseCode !in 200..299) {
+                throw IllegalStateException(json?.optString("error")?.takeIf { it.isNotBlank() } ?: "Неверный код")
+            }
+            notifyRegistration("approved")
+        } catch (e: Exception) {
+            notifyRegistration("error", e.message ?: "Не удалось войти по коду")
         } finally {
             connection?.disconnect()
         }
