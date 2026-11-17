@@ -29,12 +29,11 @@ button:focus,input:focus{outline:3px solid var(--green);outline-offset:4px;z-ind
 <div class="registration-gate" id="registrationGate">
   <div class="registration-card">
     <div class="registration-logo">ServersTV</div>
-    <h2 id="registrationTitle">Отправляем запрос…</h2>
-    <p id="registrationMessage">Подключаем приложение к системе подтверждения.</p>
-    <button id="checkRegistration" class="primary-action">Проверить статус</button>
+    <h2 id="registrationTitle">Вход в ServersTV</h2>
+    <p id="registrationMessage">Введи код доступа, чтобы открыть список серверов.</p>
     <div class="code-login">
       <label for="accessCode">Или войди по коду доступа</label>
-      <input id="accessCode" type="text" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="••••••••">
+      <input id="accessCode" type="text" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="•••••••••">
       <button id="loginByCode" type="button">Войти по коду</button>
     </div>
   </div>
@@ -57,10 +56,9 @@ function render(){
  $("selected").textContent="Выбран: "+serverName(servers[selected],selected);
 }
 window.onRegistrationStatus=function(status,detail){
- if(status==="pending"){
-  $("registrationTitle").textContent="Запрос отправлен";
-  $("registrationMessage").textContent="Можно дождаться подтверждения владельца в Telegram или войти по коду доступа ниже.";
-  $("checkRegistration").style.display="inline-block";
+ if(status==="locked"){
+  $("registrationTitle").textContent="Вход в ServersTV";
+  $("registrationMessage").textContent="Введи код доступа, чтобы открыть список серверов.";
  }else if(status==="approved"){
   if(registrationApproved)return;
   registrationApproved=true;
@@ -69,19 +67,9 @@ window.onRegistrationStatus=function(status,detail){
   clearInterval(window.registrationTimer);
   $("description").textContent="Загружаю серверы…";
   AndroidVpn.loadServers();
- }else if(status==="rejected"){
-  $("registrationTitle").textContent="Запрос отклонён";
-  $("registrationMessage").textContent="Владелец приложения отклонил регистрацию этого устройства.";
-  $("checkRegistration").style.display="none";
-  clearInterval(window.registrationTimer);
- }else if(status==="not_found"){
-  $("registrationTitle").textContent="Отправляем запрос…";
-  $("registrationMessage").textContent="Повторно отправляем запрос на регистрацию.";
-  AndroidVpn.registerDevice();
  }else if(status==="error"){
-  $("registrationTitle").textContent="Не удалось проверить регистрацию";
-  $("registrationMessage").textContent=detail||"Проверь подключение к интернету и попробуй ещё раз.";
-  $("checkRegistration").style.display="inline-block";
+  $("registrationTitle").textContent="Неверный код";
+  $("registrationMessage").textContent=detail||"Проверь код и попробуй ещё раз.";
  }
 };
 window.onServersLoaded=function(body){
@@ -107,10 +95,10 @@ $("connect").onclick=()=>{
  AndroidVpn.connect(JSON.stringify(config));
 };
 $("refresh").onclick=()=>{if(loading||!registrationApproved)return;loading=true;toast("Обновляю серверы…");AndroidVpn.loadServers();setTimeout(()=>loading=false,3000)};
-$("checkRegistration").onclick=()=>{toast("Проверяю статус…");AndroidVpn.checkRegistration()};
+
 $("loginByCode").onclick=()=>{
  const code=$("accessCode").value.trim();
- if(!/^\d{8}$/.test(code)){toast("Введи код из 8 цифр");$("accessCode").focus();return}
+ if(!/^\d{9}$/.test(code)){toast("Введи код из 9 цифр");$("accessCode").focus();return}
  toast("Проверяю код…");
  AndroidVpn.loginWithCode(code);
 };
@@ -118,13 +106,12 @@ $("accessCode").addEventListener("keydown",e=>{if(e.key==="Enter")$("loginByCode
 document.addEventListener("keydown",e=>{
  const gate=$("registrationGate");
  if(!gate.classList.contains("approved")){
-  if(["Enter"," "].includes(e.key)&&document.activeElement===$("checkRegistration")){$("checkRegistration").click();e.preventDefault()}
+  if(e.key==="Enter"&&document.activeElement===$("accessCode")){$("loginByCode").click();e.preventDefault()}
   return;
  }
  const all=[$("connect"),$("refresh"),...document.querySelectorAll(".server")],i=all.indexOf(document.activeElement);
  if(["ArrowDown","ArrowUp"].includes(e.key)){e.preventDefault();all[(Math.max(i,0)+(e.key==="ArrowDown"?1:all.length-1))%all.length]?.focus()}
  else if(["ArrowLeft","ArrowRight"].includes(e.key)){if(document.activeElement.classList.contains("server"))$("connect").focus();else if(document.activeElement===$("connect"))document.querySelector(".server")?.focus()}
 });
-AndroidVpn.registerDevice();
-window.registrationTimer=setInterval(()=>AndroidVpn.checkRegistration(),5000);
+AndroidVpn.checkLocalAccess();
 </script></body></html>
