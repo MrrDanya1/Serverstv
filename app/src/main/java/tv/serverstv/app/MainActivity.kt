@@ -65,13 +65,13 @@ class MainActivity : Activity() {
     inner class VpnBridge {
         @JavascriptInterface
         fun checkLocalAccess() {
-            notifyRegistration(if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(LOCAL_ACCESS, false)) "approved" else "locked")
+            // Require the locally embedded access code on every app launch.
+            notifyRegistration("locked")
         }
 
         @JavascriptInterface
         fun loginWithCode(code: String) {
             if (code.trim() == ACCESS_CODE) {
-                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(LOCAL_ACCESS, true).apply()
                 notifyRegistration("approved")
             } else {
                 notifyRegistration("error", "Неверный код доступа")
@@ -203,8 +203,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val VPN_PERMISSION_REQUEST = 4107
-        private const val PREFS = "serverstv_settings"
-        private const val LOCAL_ACCESS = "local_access"
         private const val ACCESS_CODE = "888889990"
         private const val API_BASE = "https://fgwvyrhjcofebyluxtbg.supabase.co/functions/v1/servers-bot"
     }
