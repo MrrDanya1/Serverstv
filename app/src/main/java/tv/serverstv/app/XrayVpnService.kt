@@ -113,6 +113,7 @@ class XrayVpnService : VpnService() {
         api.getMethod("registerDialerController", contract).invoke(null, controller)
         api.getMethod("setDNS", contract, String::class.java)
             .invoke(null, controller, "1.1.1.1:53")
+        controllerRegistered = true
     }
 
     private fun invokeLibXray(method: String, request: String? = null): String {
