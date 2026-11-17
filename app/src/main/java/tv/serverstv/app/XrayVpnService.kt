@@ -80,10 +80,11 @@ class XrayVpnService : VpnService() {
             }
             updateNotification("VPN запущен")
             sendStatus("connected", "Подключено")
-        } catch (e: Exception) {
-            stopTunnel(stopService = false, notify = false)
-            val message = e.cause?.message ?: e.message ?: "Неизвестная ошибка Xray"
-            updateNotification("Ошибка VPN: $message")
+        } catch (e: Throwable) {
+            // Keep native-library/linkage failures inside the VPN process.
+            try { stopTunnel(stopService = false, notify = false) } catch (_: Throwable) { }
+            val message = e.cause?.message ?: e.message ?: e.javaClass.simpleName
+            try { updateNotification("Ошибка VPN: $message") } catch (_: Throwable) { }
             sendStatus("error", message)
             stopSelf()
         }
@@ -126,11 +127,11 @@ class XrayVpnService : VpnService() {
                 .put("payload", JSONObject())
                 .toString()
             invokeLibXray("invoke", request)
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
         }
         try {
             Class.forName("libXray.LibXray").getMethod("resetDNS").invoke(null)
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
         }
         tun?.close()
         tun = null
