@@ -112,7 +112,7 @@ class XrayVpnService : VpnService() {
 
     private fun registerProtectController() {
         val controller = object : DialerController {
-            override fun protectFd(fd: Int): Boolean = protect(fd)
+            override fun protectFd(fd: Long): Boolean = protect(fd.toInt())
         }
         dialerController = controller
         LibXray.registerDialerController(controller)
