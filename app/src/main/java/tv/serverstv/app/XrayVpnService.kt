@@ -14,6 +14,8 @@ import java.util.concurrent.Executors
 
 class XrayVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
+    private var xrayStarted = false
+    private var controllerRegistered = false
     private val worker = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -35,7 +37,9 @@ class XrayVpnService : VpnService() {
 
     private fun startTunnel(source: String) {
         try {
-            stopTunnel(stopService = false, notify = false)
+            if (tun != null || xrayStarted) {
+                stopTunnel(stopService = false, notify = false)
+            }
             val root = JSONObject(source)
             if (root.optJSONArray("outbounds").isNullOrEmpty()) {
                 throw IllegalArgumentException("В конфигурации нет outbounds")
@@ -78,6 +82,7 @@ class XrayVpnService : VpnService() {
             if (!result.optBoolean("success", false)) {
                 throw IllegalStateException(result.optString("error", "Xray не запустился"))
             }
+            xrayStarted = true
             updateNotification("VPN запущен")
             sendStatus("connected", "Подключено")
         } catch (e: Throwable) {
@@ -120,20 +125,26 @@ class XrayVpnService : VpnService() {
     }
 
     private fun stopTunnel(stopService: Boolean = true, notify: Boolean = true) {
-        try {
-            val request = JSONObject()
-                .put("apiVersion", 3)
-                .put("method", "stopXray")
-                .put("payload", JSONObject())
-                .toString()
-            invokeLibXray("invoke", request)
-        } catch (_: Throwable) {
+        if (xrayStarted) {
+            try {
+                val request = JSONObject()
+                    .put("apiVersion", 3)
+                    .put("method", "stopXray")
+                    .put("payload", JSONObject())
+                    .toString()
+                invokeLibXray("invoke", request)
+            } catch (_: Throwable) {
+            }
+            xrayStarted = false
         }
-        try {
-            Class.forName("libXray.LibXray").getMethod("resetDNS").invoke(null)
-        } catch (_: Throwable) {
+        if (controllerRegistered) {
+            try {
+                Class.forName("libXray.LibXray").getMethod("resetDNS").invoke(null)
+            } catch (_: Throwable) {
+            }
+            controllerRegistered = false
         }
-        tun?.close()
+        try { tun?.close() } catch (_: Throwable) { }
         tun = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         if (notify) sendStatus("disconnected", "Отключено")
