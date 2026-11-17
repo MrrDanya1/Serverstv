@@ -11,6 +11,8 @@ import android.graphics.drawable.GradientDrawable
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -34,6 +36,8 @@ private data class ServerItem(
 
 class MainActivity : Activity() {
     private val io = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var connectionTimeout: Runnable? = null
     private val servers = mutableListOf<ServerItem>()
     private lateinit var root: LinearLayout
     private lateinit var serverList: LinearLayout
@@ -372,11 +376,29 @@ class MainActivity : Activity() {
     private var pendingConfig: String? = null
 
     private fun startVpn(config: String) {
+        connectionTimeout?.let(mainHandler::removeCallbacks)
+        val timeout = Runnable {
+            if (statusText.text.toString() == "Подключение…") {
+                showVpnState("error", "VPN-служба не ответила за 60 секунд. Попробуй подключиться ещё раз.")
+                try {
+                    startService(Intent(this, XrayVpnService::class.java).apply {
+                        action = XrayVpnService.ACTION_STOP
+                    })
+                } catch (_: Exception) { }
+            }
+        }
+        connectionTimeout = timeout
+        mainHandler.postDelayed(timeout, 60_000L)
+
         val intent = Intent(this, XrayVpnService::class.java).apply {
             action = XrayVpnService.ACTION_START
             putExtra(XrayVpnService.EXTRA_CONFIG, config)
         }
-        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+        try {
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+        } catch (e: Exception) {
+            showVpnState("error", e.message ?: "Не удалось запустить VPN-службу")
+        }
     }
 
     @Deprecated("Deprecated in Android API")
@@ -394,7 +416,14 @@ class MainActivity : Activity() {
 
     private fun showVpnState(state: String, detail: String) {
         when (state) {
+            "starting" -> {
+                connected = false
+                statusText.text = "Подключение…"
+                detailText.text = detail
+            }
             "connected" -> {
+                connectionTimeout?.let(mainHandler::removeCallbacks)
+                connectionTimeout = null
                 connected = true
                 connectButton.text = "✓"
                 connectButton.setTextColor(GREEN)
@@ -403,6 +432,8 @@ class MainActivity : Activity() {
                 detailText.text = servers.getOrNull(selectedIndex)?.name ?: detail
             }
             "disconnected" -> {
+                connectionTimeout?.let(mainHandler::removeCallbacks)
+                connectionTimeout = null
                 connected = false
                 connectButton.text = "⏻"
                 connectButton.setTextColor(Color.WHITE)
@@ -411,6 +442,8 @@ class MainActivity : Activity() {
                 detailText.text = detail.ifBlank { "Выбери сервер для подключения" }
             }
             "error" -> {
+                connectionTimeout?.let(mainHandler::removeCallbacks)
+                connectionTimeout = null
                 connected = false
                 connectButton.text = "⏻"
                 connectButton.setTextColor(Color.WHITE)
