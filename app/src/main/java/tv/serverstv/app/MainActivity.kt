@@ -98,7 +98,7 @@ class MainActivity : Activity() {
             setOnFocusChangeListener { view, hasFocus ->
                 view.scaleX = if (hasFocus) 1.04f else 1f
                 view.scaleY = if (hasFocus) 1.04f else 1f
-                if (hasFocus && !connected) view.setTextColor(Color.WHITE)
+                if (hasFocus && !connected) connectButton.setTextColor(Color.WHITE)
             }
         }
         left.addView(connectButton, LinearLayout.LayoutParams(dp(220), dp(220)))
@@ -342,7 +342,6 @@ class MainActivity : Activity() {
         serverList.addView(retry, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(62)
         ).apply { setMargins(dp(12), dp(4), dp(12), dp(12) })
-        )
     }
 
     private fun toggleVpn() {
