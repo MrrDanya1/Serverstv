@@ -64,21 +64,6 @@ class MainActivity : Activity() {
 
     inner class VpnBridge {
         @JavascriptInterface
-        fun checkLocalAccess() {
-            // Require the locally embedded access code on every app launch.
-            notifyRegistration("locked")
-        }
-
-        @JavascriptInterface
-        fun loginWithCode(code: String) {
-            if (code.trim() == ACCESS_CODE) {
-                notifyRegistration("approved")
-            } else {
-                notifyRegistration("error", "Неверный код доступа")
-            }
-        }
-
-        @JavascriptInterface
         fun loadServers() {
             fetchSubscriptionServers()
         }
@@ -108,15 +93,6 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun notifyRegistration(status: String, detail: String = "") {
-        runOnUiThread {
-            web.evaluateJavascript(
-                "window.onRegistrationStatus && window.onRegistrationStatus(${JSONObject.quote(status)}, ${JSONObject.quote(detail)})",
-                null
-            )
-        }
-    }
-
     private fun fetchSubscriptionServers() {
         io.execute {
             var connection: HttpURLConnection? = null
@@ -132,7 +108,6 @@ class MainActivity : Activity() {
                 val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                 if (code !in 200..299) throw IllegalStateException("HTTP $code")
                 val parsed = JSONArray(body)
-                if (parsed.length() == 0) throw IllegalStateException("В подписке пока нет серверов")
                 for (i in 0 until parsed.length()) {
                     val item = parsed.optJSONObject(i)
                         ?: throw IllegalStateException("Некорректная конфигурация №${i + 1}")
@@ -203,7 +178,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val VPN_PERMISSION_REQUEST = 4107
-        private const val ACCESS_CODE = "888889990"
         private const val API_BASE = "https://fgwvyrhjcofebyluxtbg.supabase.co/functions/v1/servers-bot"
     }
 }
