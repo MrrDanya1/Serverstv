@@ -2,7 +2,7 @@ name: Android TV APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'rewrite/native-tv']
   workflow_dispatch:
 
 permissions:
