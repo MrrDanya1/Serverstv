@@ -110,7 +110,7 @@ $("refresh").onclick=()=>{if(loading||!registrationApproved)return;loading=true;
 $("checkRegistration").onclick=()=>{toast("Проверяю статус…");AndroidVpn.checkRegistration()};
 $("loginByCode").onclick=()=>{
  const code=$("accessCode").value.trim();
- if(!/^\\d{8}$/.test(code)){toast("Введи код из 8 цифр");$("accessCode").focus();return}
+ if(!/^\d{8}$/.test(code)){toast("Введи код из 8 цифр");$("accessCode").focus();return}
  toast("Проверяю код…");
  AndroidVpn.loginWithCode(code);
 };
