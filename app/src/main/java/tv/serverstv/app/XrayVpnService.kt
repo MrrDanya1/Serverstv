@@ -9,7 +9,8 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import org.json.JSONArray
 import org.json.JSONObject
-import java.lang.reflect.Proxy
+import libXray.DialerController
+import libXray.LibXray
 import java.util.concurrent.Executors
 
 class XrayVpnService : VpnService() {
@@ -58,9 +59,9 @@ class XrayVpnService : VpnService() {
                 .establish() ?: throw IllegalStateException("Android не создал VPN-интерфейс")
 
             tun = descriptor
-            sendStatus("starting", "VPN-интерфейс создан. Настраиваю сеть…")
+            sendStatus("starting", "VPN-интерфейс создан. Регистрирую защиту сокетов…")
             registerProtectController()
-            sendStatus("starting", "Запускаю Xray…")
+            sendStatus("starting", "Защита сети настроена. Запускаю Xray…")
 
             val env = root.optJSONObject("env") ?: JSONObject().also { root.put("env", it) }
             env.put("xray.tun.fd", descriptor.fd.toString())
@@ -81,7 +82,7 @@ class XrayVpnService : VpnService() {
                 .put("payload", JSONObject().put("xrayJson", root.toString()))
                 .toString()
 
-            val response = invokeLibXray("invoke", request)
+            val response = invokeLibXray(request)
             val result = JSONObject(response)
             if (!result.optBoolean("success", false)) {
                 throw IllegalStateException(result.optString("error", "Xray не запустился"))
@@ -92,7 +93,7 @@ class XrayVpnService : VpnService() {
                 .put("method", "getXrayState")
                 .put("payload", JSONObject())
                 .toString()
-            val stateResponse = JSONObject(invokeLibXray("invoke", stateRequest))
+            val stateResponse = JSONObject(invokeLibXray(stateRequest))
             val running = stateResponse.optJSONObject("data")?.optBoolean("running", false) == true
             if (!running) throw IllegalStateException("Xray сообщил, что VPN не запущен")
             updateNotification("VPN запущен")
@@ -107,35 +108,22 @@ class XrayVpnService : VpnService() {
         }
     }
 
+    private var dialerController: DialerController? = null
+
     private fun registerProtectController() {
-        val api = Class.forName("libXray.LibXray")
-        val contract = Class.forName("libXray.DialerController")
-        val controller = Proxy.newProxyInstance(
-            contract.classLoader,
-            arrayOf(contract)
-        ) { _, method, args ->
-            when {
-                method.name.equals("protectFd", ignoreCase = true) -> {
-                    val fd = (args?.firstOrNull() as? Number)?.toInt() ?: -1
-                    protect(fd)
-                }
-                else -> null
-            }
+        val controller = object : DialerController {
+            override fun protectFd(fd: Int): Boolean = protect(fd)
         }
-        api.getMethod("registerDialerController", contract).invoke(null, controller)
-        api.getMethod("setDNS", contract, String::class.java)
-            .invoke(null, controller, "1.1.1.1:53")
+        dialerController = controller
+        LibXray.registerDialerController(controller)
         controllerRegistered = true
+        sendStatus("starting", "Защита сокетов включена. Настраиваю DNS…")
+        LibXray.setDNS(controller, "1.1.1.1:53")
+        sendStatus("starting", "DNS настроен. Подготавливаю запуск Xray…")
     }
 
-    private fun invokeLibXray(method: String, request: String? = null): String {
-        val api = Class.forName("libXray.LibXray")
-        return if (request == null) {
-            api.getMethod(method).invoke(null) as? String ?: "{}"
-        } else {
-            api.getMethod(method, String::class.java).invoke(null, request) as? String ?: "{}"
-        }
-    }
+    private fun invokeLibXray(request: String): String =
+        LibXray.invoke(request)
 
     private fun stopTunnel(stopService: Boolean = true, notify: Boolean = true) {
         if (xrayStarted) {
@@ -145,18 +133,19 @@ class XrayVpnService : VpnService() {
                     .put("method", "stopXray")
                     .put("payload", JSONObject())
                     .toString()
-                invokeLibXray("invoke", request)
+                invokeLibXray(request)
             } catch (_: Throwable) {
             }
             xrayStarted = false
         }
         if (controllerRegistered) {
             try {
-                Class.forName("libXray.LibXray").getMethod("resetDNS").invoke(null)
+                LibXray.resetDNS()
             } catch (_: Throwable) {
             }
             controllerRegistered = false
         }
+        dialerController = null
         try { tun?.close() } catch (_: Throwable) { }
         tun = null
         stopForeground(STOP_FOREGROUND_REMOVE)
