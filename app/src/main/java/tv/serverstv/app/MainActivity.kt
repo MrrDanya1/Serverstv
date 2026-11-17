@@ -341,7 +341,7 @@ class MainActivity : Activity() {
         val retry = actionText("Повторить загрузку") { loadServers(force = true) }
         serverList.addView(retry, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(62)
-        ).apply { setMargins(dp(12), dp(4), dp(12), dp(12) })
+        ).apply { setMargins(dp(12), dp(4), dp(12), dp(12)) })
     }
 
     private fun toggleVpn() {
