@@ -29,6 +29,7 @@ class XrayVpnService : VpnService() {
                     return START_NOT_STICKY
                 }
                 startForeground(NOTIFICATION_ID, notification("Подготовка VPN"))
+                sendStatus("starting", "Запускаю VPN-службу…")
                 worker.execute { startTunnel(config) }
             }
         }
@@ -40,6 +41,7 @@ class XrayVpnService : VpnService() {
             if (tun != null || xrayStarted) {
                 stopTunnel(stopService = false, notify = false)
             }
+            sendStatus("starting", "Проверяю конфигурацию сервера…")
             val root = JSONObject(source)
             if (root.optJSONArray("outbounds").isNullOrEmpty()) {
                 throw IllegalArgumentException("В конфигурации нет outbounds")
@@ -56,7 +58,9 @@ class XrayVpnService : VpnService() {
                 .establish() ?: throw IllegalStateException("Android не создал VPN-интерфейс")
 
             tun = descriptor
+            sendStatus("starting", "VPN-интерфейс создан. Настраиваю сеть…")
             registerProtectController()
+            sendStatus("starting", "Запускаю Xray…")
 
             val env = root.optJSONObject("env") ?: JSONObject().also { root.put("env", it) }
             env.put("xray.tun.fd", descriptor.fd.toString())
@@ -83,6 +87,14 @@ class XrayVpnService : VpnService() {
                 throw IllegalStateException(result.optString("error", "Xray не запустился"))
             }
             xrayStarted = true
+            val stateRequest = JSONObject()
+                .put("apiVersion", 3)
+                .put("method", "getXrayState")
+                .put("payload", JSONObject())
+                .toString()
+            val stateResponse = JSONObject(invokeLibXray("invoke", stateRequest))
+            val running = stateResponse.optJSONObject("data")?.optBoolean("running", false) == true
+            if (!running) throw IllegalStateException("Xray сообщил, что VPN не запущен")
             updateNotification("VPN запущен")
             sendStatus("connected", "Подключено")
         } catch (e: Throwable) {
