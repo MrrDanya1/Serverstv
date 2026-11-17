@@ -19,7 +19,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.SecureRandom
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
@@ -65,18 +64,18 @@ class MainActivity : Activity() {
 
     inner class VpnBridge {
         @JavascriptInterface
-        fun registerDevice() {
-            io.execute { sendRegistrationRequest() }
-        }
-
-        @JavascriptInterface
-        fun checkRegistration() {
-            io.execute { checkRegistrationStatus() }
+        fun checkLocalAccess() {
+            notifyRegistration(if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(LOCAL_ACCESS, false)) "approved" else "locked")
         }
 
         @JavascriptInterface
         fun loginWithCode(code: String) {
-            io.execute { loginWithAccessCode(code) }
+            if (code.trim() == ACCESS_CODE) {
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(LOCAL_ACCESS, true).apply()
+                notifyRegistration("approved")
+            } else {
+                notifyRegistration("error", "Неверный код доступа")
+            }
         }
 
         @JavascriptInterface
@@ -109,117 +108,12 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun getDeviceKey(): String {
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        val saved = prefs.getString(KEY_DEVICE_KEY, null)
-        if (!saved.isNullOrBlank()) return saved
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
-        val key = bytes.joinToString("") { "%02x".format(it) }
-        prefs.edit().putString(KEY_DEVICE_KEY, key).apply()
-        return key
-    }
-
     private fun notifyRegistration(status: String, detail: String = "") {
         runOnUiThread {
             web.evaluateJavascript(
                 "window.onRegistrationStatus && window.onRegistrationStatus(${JSONObject.quote(status)}, ${JSONObject.quote(detail)})",
                 null
             )
-        }
-    }
-
-    private fun sendRegistrationRequest() {
-        var connection: HttpURLConnection? = null
-        try {
-            val deviceName = listOf(Build.MANUFACTURER, Build.MODEL)
-                .filter { it.isNotBlank() }.distinct().joinToString(" ").take(100)
-                .ifBlank { "Android TV" }
-            connection = URL("$API_BASE?action=register").openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "ServersTV/0.3 Android")
-            val body = JSONObject().put("deviceKey", getDeviceKey()).put("deviceName", deviceName).toString()
-            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) throw IllegalStateException(JSONObject(response).optString("error", "HTTP $code"))
-            notifyRegistration(JSONObject(response).optString("status", "pending"))
-        } catch (e: Exception) {
-            notifyRegistration("error", e.message ?: "Не удалось отправить запрос")
-        } finally {
-            connection?.disconnect()
-        }
-    }
-
-
-    private fun loginWithAccessCode(code: String) {
-        var connection: HttpURLConnection? = null
-        try {
-            val cleanCode = code.trim()
-            if (!cleanCode.matches(Regex("\\d{8}"))) {
-                notifyRegistration("error", "Введи код из 8 цифр")
-                return
-            }
-            val deviceName = listOf(Build.MANUFACTURER, Build.MODEL)
-                .filter { it.isNotBlank() }.distinct().joinToString(" ").take(100)
-                .ifBlank { "Android TV" }
-            connection = URL("$API_BASE?action=login_code").openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "ServersTV/0.4 Android")
-            val body = JSONObject()
-                .put("deviceKey", getDeviceKey())
-                .put("deviceName", deviceName)
-                .put("code", cleanCode)
-                .toString()
-            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val responseCode = connection.responseCode
-            val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
-            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            val json = runCatching { JSONObject(response) }.getOrNull()
-            if (responseCode !in 200..299) {
-                throw IllegalStateException(json?.optString("error")?.takeIf { it.isNotBlank() } ?: "Неверный код")
-            }
-            notifyRegistration("approved")
-        } catch (e: Exception) {
-            notifyRegistration("error", e.message ?: "Не удалось войти по коду")
-        } finally {
-            connection?.disconnect()
-        }
-    }
-
-    private fun checkRegistrationStatus() {
-        var connection: HttpURLConnection? = null
-        try {
-            connection = URL("$API_BASE?action=status").openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
-            connection.setRequestProperty("X-Device-Key", getDeviceKey())
-            connection.setRequestProperty("Accept", "application/json")
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            if (code == 404) {
-                notifyRegistration("not_found")
-                return
-            }
-            if (code !in 200..299) throw IllegalStateException("HTTP $code")
-            notifyRegistration(JSONObject(response).optString("status", "pending"))
-        } catch (e: Exception) {
-            notifyRegistration("error", e.message ?: "Не удалось проверить статус")
-        } finally {
-            connection?.disconnect()
         }
     }
 
@@ -232,7 +126,6 @@ class MainActivity : Activity() {
                 connection.connectTimeout = 15000
                 connection.readTimeout = 20000
                 connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("X-Device-Key", getDeviceKey())
                 connection.setRequestProperty("User-Agent", "ServersTV/0.3 Android")
                 val code = connection.responseCode
                 val stream = if (code in 200..299) connection.inputStream else connection.errorStream
@@ -311,7 +204,8 @@ class MainActivity : Activity() {
     companion object {
         private const val VPN_PERMISSION_REQUEST = 4107
         private const val PREFS = "serverstv_settings"
-        private const val KEY_DEVICE_KEY = "device_key"
+        private const val LOCAL_ACCESS = "local_access"
+        private const val ACCESS_CODE = "888889990"
         private const val API_BASE = "https://fgwvyrhjcofebyluxtbg.supabase.co/functions/v1/servers-bot"
     }
 }
