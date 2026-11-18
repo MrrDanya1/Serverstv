@@ -9,14 +9,12 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import org.json.JSONArray
 import org.json.JSONObject
-import libXray.DialerController
 import libXray.LibXray
 import java.util.concurrent.Executors
 
 class XrayVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var xrayStarted = false
-    private var controllerRegistered = false
     private val worker = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -51,6 +49,8 @@ class XrayVpnService : VpnService() {
             val descriptor = Builder()
                 .setSession("ServersTV")
                 .setMtu(1500)
+                // Keep Xray's own sockets outside this VPN to prevent routing loops.
+                .addDisallowedApplication(packageName)
                 .addAddress("10.111.0.1", 32)
                 .addAddress("fd00:1111:1111::1", 128)
                 .addRoute("0.0.0.0", 0)
@@ -59,9 +59,8 @@ class XrayVpnService : VpnService() {
                 .establish() ?: throw IllegalStateException("Android не создал VPN-интерфейс")
 
             tun = descriptor
-            sendStatus("starting", "VPN-интерфейс создан. Регистрирую защиту сокетов…")
-            registerProtectController()
-            sendStatus("starting", "Защита сети настроена. Запускаю Xray…")
+            sendStatus("starting", "VPN-интерфейс создан. Исключаю VPN-службу из туннеля…")
+            sendStatus("starting", "Подготавливаю запуск Xray…")
 
             val env = root.optJSONObject("env") ?: JSONObject().also { root.put("env", it) }
             env.put("xray.tun.fd", descriptor.fd.toString())
@@ -109,21 +108,6 @@ class XrayVpnService : VpnService() {
         }
     }
 
-    private var dialerController: DialerController? = null
-
-    private fun registerProtectController() {
-        val controller = object : DialerController {
-            override fun protectFd(fd: Long): Boolean = protect(fd.toInt())
-        }
-        dialerController = controller
-        sendStatus("starting", "Регистрирую обработчик защиты сокетов…")
-        LibXray.registerDialerController(controller)
-        controllerRegistered = true
-        sendStatus("starting", "Защита сокетов зарегистрирована. Настраиваю DNS…")
-        LibXray.setDNS(controller, "1.1.1.1:53")
-        sendStatus("starting", "DNS настроен. Подготавливаю запуск Xray…")
-    }
-
     private fun invokeLibXray(request: String): String =
         LibXray.invoke(request)
 
@@ -140,14 +124,6 @@ class XrayVpnService : VpnService() {
             }
             xrayStarted = false
         }
-        if (controllerRegistered) {
-            try {
-                LibXray.resetDNS()
-            } catch (_: Throwable) {
-            }
-            controllerRegistered = false
-        }
-        dialerController = null
         try { tun?.close() } catch (_: Throwable) { }
         tun = null
         stopForeground(STOP_FOREGROUND_REMOVE)
