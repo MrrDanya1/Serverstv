@@ -68,7 +68,6 @@ class XrayVpnService : VpnService() {
             val inbounds = JSONArray()
             inbounds.put(JSONObject()
                 .put("tag", "tun-in")
-                .put("port", 0)
                 .put("protocol", "tun")
                 .put("settings", JSONObject()
                     .put("name", "ServersTV")
