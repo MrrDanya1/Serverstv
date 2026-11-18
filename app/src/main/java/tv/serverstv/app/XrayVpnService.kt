@@ -102,8 +102,9 @@ class XrayVpnService : VpnService() {
             // Keep native-library/linkage failures inside the VPN process.
             try { stopTunnel(stopService = false, notify = false) } catch (_: Throwable) { }
             val message = e.cause?.message ?: e.message ?: e.javaClass.simpleName
+            val diagnostic = message + " (" + e.javaClass.simpleName + ")"
             try { updateNotification("Ошибка VPN: $message") } catch (_: Throwable) { }
-            sendStatus("error", message)
+            sendStatus("error", diagnostic)
             stopSelf()
         }
     }
@@ -115,9 +116,10 @@ class XrayVpnService : VpnService() {
             override fun protectFd(fd: Long): Boolean = protect(fd.toInt())
         }
         dialerController = controller
+        sendStatus("starting", "Регистрирую обработчик защиты сокетов…")
         LibXray.registerDialerController(controller)
         controllerRegistered = true
-        sendStatus("starting", "Защита сокетов включена. Настраиваю DNS…")
+        sendStatus("starting", "Защита сокетов зарегистрирована. Настраиваю DNS…")
         LibXray.setDNS(controller, "1.1.1.1:53")
         sendStatus("starting", "DNS настроен. Подготавливаю запуск Xray…")
     }
@@ -194,7 +196,8 @@ class XrayVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        worker.execute { stopTunnel() }
+        // Keep the last error visible instead of replacing it with "Отключено".
+        worker.execute { stopTunnel(notify = false) }
         worker.shutdown()
         super.onDestroy()
     }
